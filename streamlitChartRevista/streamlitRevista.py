@@ -16,7 +16,7 @@ st.set_page_config(
 st.header("Gráficos mejorados para publicaciones")
 
 # Carga de datos desde archivos CSV
-dfDatos = pd.read_csv("./car-sales.csv")
+dfDatos = pd.read_csv("./car_sales.csv")
 dfDatosExportadores = pd.read_csv("./Exporters-of-Electric-motor-Vehicles-2018---2022.csv",usecols=['Continent', 'Country', 'Year','Trade Value','Trade Value Growth Value'])
 dfDatosImportadores = pd.read_csv("./Importers-of-Electric-motor-Vehicles-2018---2022.csv",usecols=['Continent', 'Country', 'Year','Trade Value','Trade Value Growth Value'])
 dfDatosImpoExpo=dfDatosImportadores.merge(dfDatosExportadores,on=['Continent', 'Country', 'Year'],suffixes=["_impo","_expo"])
