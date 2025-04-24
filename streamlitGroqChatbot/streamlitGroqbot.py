@@ -3,95 +3,92 @@ import pandas as pd
 import time
 from groq import Groq
 from typing import Generator
+from PIL import Image
+import google.generativeai as genai
+from io import BytesIO  # Para manejar imágenes correctamente
 
-st.title("Groq Bot")
+# Configuración del chatbot con Groq
+st.title("Groq Bot Mejorado con Análisis de Imágenes y Gemini")
 
-# Declaramos el cliente de Groq
 client = Groq(
-    api_key=st.secrets["gsk"]["ngroq_key"]  # Con "gsk" cargamos la API key de la carpeta .streamlit/secrets.toml
+    api_key=st.secrets["gsk"]["ngroq_key"]
 )
 
-# Lista de modelos para elegir
+# Configuración de Google Gemini API
+genai.configure(api_key=st.secrets["gemini"]["api_key"])
+
+# Lista de modelos disponibles en Groq
 modelos = ['llama3-8b-8192', 'llama3-70b-8192', 'mixtral-8x7b-32768']
 
+# Función para generar respuestas del chatbot
 def generate_chat_responses(chat_completion) -> Generator[str, None, None]:
-    """Genera respuestas de chat a partir de la información de completado de chat, mostrando caracter por caracter."""
+    """Genera respuestas de chat en tiempo real."""
     for chunk in chat_completion:
         if chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
 
-
-# Inicializamos el historial de chat
+# Inicialización del historial de mensajes
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Muestra mensajes de chat desde la historia en la aplicación cada vez que la aplicación se ejecuta
+# Mostrar historial de chat
 with st.container():
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# Mostramos la lista de modelos en el sidebar
+# Sidebar: selección de modelo y carga de archivos
 parModelo = st.sidebar.selectbox('Modelos', options=modelos, index=0)
 
-# Funcionalidad de adjuntar documentos
 uploaded_file = st.sidebar.file_uploader(
-    "Adjunta tu archivo (TXT, PDF, Word, Excel)", 
-    type=["txt", "pdf", "docx", "xls", "xlsx"]
+    "Adjunta un archivo (TXT, PDF, Word, Excel, Imagen)", 
+    type=["txt", "pdf", "docx", "xls", "xlsx", "png", "jpg", "jpeg"]
 )
 
 if uploaded_file:
     try:
         st.sidebar.success(f"Archivo adjuntado: {uploaded_file.name}")
-        
-        # Procesar archivos de texto
-        if uploaded_file.type == "text/plain":
-            content = uploaded_file.read().decode("utf-8")
-            st.text_area("Contenido del archivo", content, height=200)
 
-        # Procesar archivos de Excel
-        elif uploaded_file.type in ["application/vnd.ms-excel", 
-                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]:
-            df = pd.read_excel(uploaded_file)  # Leer el archivo Excel con pandas
-            st.dataframe(df.head())  # Mostrar las primeras filas del archivo como tabla
+        # Procesamiento de imágenes con Gemini
+        if uploaded_file.type in ["image/png", "image/jpeg", "image/jpg"]:
+            img = Image.open(BytesIO(uploaded_file.getvalue()))  # Convierte los bytes en imagen correctamente
+            st.image(img, caption="Imagen subida", use_column_width=True)
 
-        # Procesar archivos PDF
-        elif uploaded_file.type == "application/pdf":
-            st.info("Procesamiento de PDF aún no implementado.")
+            # Enviar la imagen a Gemini API para análisis
+            model = genai.GenerativeModel("gemini-1.5-flash")  # Más rápido  
+            response = model.generate_content([img])  # Enviar imagen correctamente
 
-        # Procesar documentos Word
-        elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            st.info("Procesamiento de documentos Word aún no implementado.")
+            # Mostrar la descripción generada por Gemini
+            st.write("Descripción de la imagen:", response.text)
+
+            # Permitir preguntas sobre la imagen
+            prompt_img = st.text_input("Escribe una consulta sobre la imagen")
+            if prompt_img:
+                img_query_response = model.generate_content([img, prompt_img])  # Consulta sobre la imagen
+                st.write("Respuesta sobre la imagen:", img_query_response.text)
 
     except Exception as e:
         st.sidebar.error(f"Error al procesar el archivo: {e}")
 
-# Campo para el prompt del usuario
-prompt = st.chat_input("Qué quieres saber?")
+# Campo de entrada de texto para el chatbot
+prompt = st.chat_input("¿Qué quieres saber?")
 
 if prompt:
-    # Mostrar mensaje de usuario en el contenedor de mensajes de chat
     st.chat_message("user").markdown(prompt)
-    # Agregar mensaje de usuario al historial de chat
     st.session_state.messages.append({"role": "user", "content": prompt})
+
     try:
         chat_completion = client.chat.completions.create(
             model=parModelo,
-            messages=[
-                {
-                    "role": m["role"],
-                    "content": m["content"]
-                }
-                for m in st.session_state.messages
-            ],  # Entregamos el historial de los mensajes para que el modelo tenga algo de memoria
+            messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
             stream=True
         )
-        # Mostrar respuesta del asistente en el contenedor de mensajes de chat
+
         with st.chat_message("assistant"):
             chat_responses_generator = generate_chat_responses(chat_completion)
-            # Usamos st.write_stream para simular escritura
             full_response = st.write_stream(chat_responses_generator)
-        # Agregar respuesta de asistente al historial de chat
+
         st.session_state.messages.append({"role": "assistant", "content": full_response})
-    except Exception as e:  # Informamos si hay un error
+
+    except Exception as e:
         st.error(e)

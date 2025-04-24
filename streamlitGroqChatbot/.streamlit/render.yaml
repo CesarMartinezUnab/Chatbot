@@ -1,0 +1,12 @@
+services:
+  - name: chatbot-streamlit
+    type: web
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt && pip install google-generativeai"
+    startCommand: "streamlit run streamlitGroqChatbot/streamlitGroqbot.py"
+    envVars:
+      - key: GROQ_API_KEY
+        value: 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
+      - key: GEMINI_API_KEY
+        value: AIzaSyDEZLIMjQnK9vKyDFWFoH88VwMw-DgmaXc
