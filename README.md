@@ -68,5 +68,5 @@ python -m venv .venv
 source .venv/bin/activate  # En Linux/macOS
 .venv\Scripts\activate  # En Windows
 pip install -r requirements.txt
-pip install google-generativeai  # No olvides que esta instalación es por separada
+pip install google-generativeai  # No olvides que esta instalación es por separada.
 ```
